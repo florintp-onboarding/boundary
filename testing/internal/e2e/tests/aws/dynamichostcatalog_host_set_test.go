@@ -52,12 +52,24 @@ func TestCliCreateAwsDynamicHostCatalogWithHostSet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedHostSetCount1, actualHostSetCount1, "Numbers of hosts in host set did not match expected amount")
 
-	// Set up another host set
-	newHostSetId2 := boundary.CreateNewAwsHostSetCli(t, ctx, newHostCatalogId, c.AwsHostSetFilter2)
-	actualHostSetCount2 := boundary.WaitForHostsInHostSetCli(t, ctx, newHostSetId2)
+	// Update host set with a different filter
+	output := e2e.RunCommand(ctx, "boundary",
+		e2e.WithArgs(
+			"host-sets", "update", "plugin",
+			"-id", newHostSetId1,
+			"-attr", fmt.Sprintf("filters=%s", c.AwsHostSetFilter2),
+		),
+	)
+	require.NoError(t, output.Err, string(output.Stderr))
+	actualHostSetCount1 = boundary.WaitForHostsInHostSetCli(t, ctx, newHostSetId1)
 	var targetIps2 []string
 	err = json.Unmarshal([]byte(c.AwsHostSetIps2), &targetIps2)
 	expectedHostSetCount2 := len(targetIps2)
+	assert.Equal(t, expectedHostSetCount2, actualHostSetCount1, "Numbers of hosts in host set did not match expected amount")
+
+	// Set up another host set
+	newHostSetId2 := boundary.CreateNewAwsHostSetCli(t, ctx, newHostCatalogId, c.AwsHostSetFilter2)
+	actualHostSetCount2 := boundary.WaitForHostsInHostSetCli(t, ctx, newHostSetId2)
 	require.NoError(t, err)
 	assert.Equal(t, expectedHostSetCount2, actualHostSetCount2, "Numbers of hosts in host set did not match expected amount")
 
@@ -102,7 +114,7 @@ func TestCliCreateAwsDynamicHostCatalogWithHostSet(t *testing.T) {
 	boundary.AddHostSourceToTargetCli(t, ctx, newTargetId, newHostSetId1)
 
 	// Connect to target
-	output := e2e.RunCommand(ctx, "boundary",
+	output = e2e.RunCommand(ctx, "boundary",
 		e2e.WithArgs(
 			"connect",
 			"-target-id", newTargetId,
